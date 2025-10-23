@@ -30,6 +30,14 @@ jobs:
       - name: Verify imported GPG key
         run: gpg --list-secret-keys --keyid-format LONG
 
+      - name: Show Maven settings (sanitized)
+        run: |
+          SETTINGS="$HOME/.m2/settings.xml"
+          test -f "$SETTINGS" || (echo "No settings.xml found!" && exit 1)
+          sed -E 's#(<username>).*?(</username>)#\1***\2#g; s#(<password>).*?(</password>)#\1***\2#g' "$SETTINGS" \
+            | grep -A2 '<id>central</id>' || (echo "No <server> with id=central found" && exit 1)
+
+
       - name: Build and publish (Central plugin)
         run: mvn -B -DskipTests deploy
         env:
