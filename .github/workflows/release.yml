@@ -25,13 +25,33 @@ jobs:
 
       - name: Import GPG private key
         run: |
+          # Create .gnupg directory with correct permissions
           mkdir -p ~/.gnupg
-          # import ASCII-armored private key from secret
+          chmod 700 ~/.gnupg
+          
+          # Configure GPG for non-interactive use
+          cat > ~/.gnupg/gpg.conf <<EOF
+          use-agent
+          pinentry-mode loopback
+          EOF
+          
+          cat > ~/.gnupg/gpg-agent.conf <<EOF
+          allow-loopback-pinentry
+          EOF
+          
+          chmod 600 ~/.gnupg/gpg.conf
+          chmod 600 ~/.gnupg/gpg-agent.conf
+          
+          # Import the GPG private key
           echo "$GPG_PRIVATE_KEY" | gpg --batch --import
-          # allow loopback pinentry so maven-gpg-plugin can provide passphrase
-          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
-          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          
+          # Restart GPG agent to pick up config changes
           gpgconf --kill gpg-agent || true
+          gpg-agent --daemon || true
+          
+          # List keys to verify import (for debugging)
+          echo "Imported GPG keys:"
+          gpg --list-secret-keys --keyid-format LONG
 
       - name: Create Maven settings.xml with OSSRH credentials
         run: |
@@ -54,4 +74,8 @@ jobs:
         env:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          mvn -B -Dgpg.passphrase="${GPG_PASSPHRASE}" -DskipTests clean deploy
+          mvn -B \
+            -Dgpg.passphrase="${GPG_PASSPHRASE}" \
+            -Dgpg.pinentry-mode=loopback \
+            -DskipTests \
+            clean deploy
