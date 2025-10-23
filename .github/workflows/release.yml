@@ -1,6 +1,13 @@
+name: Release to Maven Central
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
 jobs:
   deploy:
-    environment: env        # <-- unlocks environment secrets
+    environment: env            # use the actual Environment name you created
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -14,15 +21,26 @@ jobs:
           distribution: 'temurin'
           java-version: '11'
           cache: 'maven'
+          # This writes <server id="central"> into settings.xml
           server-id: central
-          server-username: CENTRAL_USERNAME   # env var name
-          server-password: CENTRAL_PASSWORD   # env var name
+          server-username: CENTRAL_USERNAME
+          server-password: CENTRAL_PASSWORD
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg-passphrase: GPG_PASSPHRASE
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
           GPG_PASSPHRASE:  ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Verify imported GPG key
+        run: gpg --list-secret-keys --keyid-format LONG
+
+      - name: Show Maven settings (sanitized)
+        run: |
+          SETTINGS="$HOME/.m2/settings.xml"
+          test -f "$SETTINGS" || (echo "No settings.xml found!" && exit 1)
+          sed -E 's#(<username>).*?(</username>)#\1***\2#g; s#(<password>).*?(</password>)#\1***\2#g' "$SETTINGS" \
+            | grep -A2 '<id>central</id>' || (echo "No <server> with id=central found" && exit 1)
 
       - name: Build and publish (Central plugin)
         run: mvn -B -DskipTests deploy
