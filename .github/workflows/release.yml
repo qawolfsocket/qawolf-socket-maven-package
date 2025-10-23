@@ -1,4 +1,4 @@
-name: Release to Maven Central
+name: Release to Maven Central (Central Publishing)
 
 on:
   release:
@@ -7,29 +7,30 @@ on:
 
 jobs:
   deploy:
-    environment: env            # use the actual Environment name you created
+    environment: env
     runs-on: ubuntu-latest
     permissions:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out
+        uses: actions/checkout@v4
 
       - name: Set up Java and configure Maven + GPG
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '11'
+          java-version: '11'          # or 17 if your project requires it
           cache: 'maven'
-          # This writes <server id="central"> into settings.xml
+          # Writes a <server> with <id>central</id> into ~/.m2/settings.xml
           server-id: central
-          server-username: CENTRAL_USERNAME
-          server-password: CENTRAL_PASSWORD
+          server-username: CENTRAL_USERNAME    # env var *name*
+          server-password: CENTRAL_PASSWORD    # env var *name*
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg-passphrase: GPG_PASSPHRASE
         env:
-          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
-          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}   # Central user token name
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}   # Central user token password
           GPG_PASSPHRASE:  ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Verify imported GPG key
@@ -45,4 +46,5 @@ jobs:
       - name: Build and publish (Central plugin)
         run: mvn -B -DskipTests deploy
         env:
+          # For maven-gpg-plugin to read passphrase without CLI prompts
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
