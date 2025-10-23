@@ -3,79 +3,32 @@ name: Release to Maven Central
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    env:
-      OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-      OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
-      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK 11
+      - name: Set up Java and configure Maven + GPG
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '11'
+          cache: 'maven'
+          server-id: ossrh
+          server-username: ${{ secrets.OSSRH_USERNAME }}
+          server-password: ${{ secrets.OSSRH_PASSWORD }}
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-      - name: Import GPG private key
+      - name: Verify imported GPG key
         run: |
-          # Create .gnupg directory with correct permissions
-          mkdir -p ~/.gnupg
-          chmod 700 ~/.gnupg
-          
-          # Configure GPG for non-interactive use
-          cat > ~/.gnupg/gpg.conf <<EOF
-          use-agent
-          pinentry-mode loopback
-          EOF
-          
-          cat > ~/.gnupg/gpg-agent.conf <<EOF
-          allow-loopback-pinentry
-          EOF
-          
-          chmod 600 ~/.gnupg/gpg.conf
-          chmod 600 ~/.gnupg/gpg-agent.conf
-          
-          # Import the GPG private key
-          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
-          
-          # Restart GPG agent to pick up config changes
-          gpgconf --kill gpg-agent || true
-          gpg-agent --daemon || true
-          
-          # List keys to verify import (for debugging)
-          echo "Imported GPG keys:"
           gpg --list-secret-keys --keyid-format LONG
 
-      - name: Create Maven settings.xml with OSSRH credentials
-        run: |
-          mkdir -p ~/.m2
-          cat > ~/.m2/settings.xml <<'SETTINGS'
-          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
-            <servers>
-              <server>
-                <id>ossrh</id>
-                <username>${env.OSSRH_USERNAME}</username>
-                <password>${env.OSSRH_PASSWORD}</password>
-              </server>
-            </servers>
-          </settings>
-          SETTINGS
-
       - name: Build and deploy (signed)
-        env:
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          mvn -B \
-            -Dgpg.passphrase="${GPG_PASSPHRASE}" \
-            -Dgpg.pinentry-mode=loopback \
-            -DskipTests \
-            clean deploy
+          mvn -B -Dgpg.passphrase="${{ secrets.GPG_PASSPHRASE }}" -DskipTests clean deploy
