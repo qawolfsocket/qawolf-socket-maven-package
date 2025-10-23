@@ -25,9 +25,9 @@ jobs:
           # 'central' matches the <server> id used by the Central publishing plugin/settings
           server-id: central
           server-username: MAVEN_USERNAME
-          server-password: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}   # ASCII-armored private key
-          gpg-passphrase: MAVEN_GPG_USERNAME
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
       # Optional: align project version with the release tag
       - name: Set version from tag
