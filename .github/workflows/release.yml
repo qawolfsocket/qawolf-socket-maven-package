@@ -1,12 +1,6 @@
-name: Release to Maven Central
-
-on:
-  release:
-    types: [published]
-  workflow_dispatch:
-
 jobs:
   deploy:
+    environment: env        # <-- unlocks environment secrets
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -20,26 +14,17 @@ jobs:
           distribution: 'temurin'
           java-version: '11'
           cache: 'maven'
-          # This writes <server id="central"> into settings.xml
           server-id: central
-          server-username: ${{ secrets.CENTRAL_USERNAME }}
-          server-password: ${{ secrets.CENTRAL_PASSWORD }}
+          server-username: CENTRAL_USERNAME   # env var name
+          server-password: CENTRAL_PASSWORD   # env var name
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
-          gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
-
-      - name: Verify imported GPG key
-        run: gpg --list-secret-keys --keyid-format LONG
-
-      - name: Show Maven settings (sanitized)
-        run: |
-          SETTINGS="$HOME/.m2/settings.xml"
-          test -f "$SETTINGS" || (echo "No settings.xml found!" && exit 1)
-          sed -E 's#(<username>).*?(</username>)#\1***\2#g; s#(<password>).*?(</password>)#\1***\2#g' "$SETTINGS" \
-            | grep -A2 '<id>central</id>' || (echo "No <server> with id=central found" && exit 1)
-
+          gpg-passphrase: GPG_PASSPHRASE
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          GPG_PASSPHRASE:  ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Build and publish (Central plugin)
         run: mvn -B -DskipTests deploy
         env:
-          # Let maven-gpg-plugin read passphrase via env, not CLI
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
