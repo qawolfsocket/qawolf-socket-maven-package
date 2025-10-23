@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+
     steps:
       - uses: actions/checkout@v4
 
@@ -19,16 +20,18 @@ jobs:
           distribution: 'temurin'
           java-version: '11'
           cache: 'maven'
-          server-id: ossrh
+          # This writes <server id="central"> into settings.xml
+          server-id: central
           server-username: ${{ secrets.OSSRH_USERNAME }}
           server-password: ${{ secrets.OSSRH_PASSWORD }}
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Verify imported GPG key
-        run: |
-          gpg --list-secret-keys --keyid-format LONG
+        run: gpg --list-secret-keys --keyid-format LONG
 
-      - name: Build and deploy (signed)
-        run: |
-          mvn -B -Dgpg.passphrase="${{ secrets.GPG_PASSPHRASE }}" -DskipTests clean deploy
+      - name: Build and publish (Central plugin)
+        run: mvn -B -DskipTests deploy
+        env:
+          # Let maven-gpg-plugin read passphrase via env, not CLI
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
